@@ -20,7 +20,7 @@ module LSys =
     let matchRules rules x =
         let matching = rules |> List.tryFind (fun (pred,_) -> pred = x)
         match matching with
-        | None -> Array.empty
+        | None -> [|x|]
         | Some (pred,succ) -> succ
 
     let step rules axiom =
@@ -36,8 +36,8 @@ module LSys =
                          rules = [ A %> [|A;B;A|]
                                    B %> [|B;B;B|] ] }
     module PythTree =
-        type State = {pos:PointF; angle:float}
-        let init x y = {pos=PointF(x,y); angle=Math.PI/2.0}
+        type State = {pos:PointF; angle:int}
+        let init x y = {pos=PointF(x,y); angle=0}
         type T = O | I | LB | RB
         let system() = { axiom = [| O |]
                          rules = [ O %> [|I;LB;O;RB;O|]
@@ -122,22 +122,54 @@ let folder rules (axiom,lines) i =
 
 
 
-let folderPyth rules (axiom,lines,(stateStack:LSys.PythTree.State list)) i =
-    let y = (float32 i)*15.0f
-    let w = 800.0f / float32 (Seq.length axiom)
-    let state = List.head stateStack
-    let lastState,lines = axiom |> Array.fold (fun (stateStack,lines) s ->
-        match s with
-        | O ->
-            let newPos = PointF(state.pos.X + float32 (Math.Cos(state.angle))*10.0f,state.pos.Y + float32 (Math.Sin(state.angle))*10.0f)
-            ({state with pos = newPos} :: stateStack, Array.concat([lines; [|state.pos; newPos|] ]))
-        | I -> 
-            let newPos = PointF(state.pos.X + float32 (Math.Cos(state.angle))*10.0f,state.pos.Y + float32 (Math.Sin(state.angle))*20.0f)
-            ({state with pos = newPos} :: stateStack, Array.concat([lines; [|state.pos; newPos|] ]))
-        | LB -> (stateStack,lines)//[||]
-        | RB -> (stateStack,lines) ) (stateStack,lines)
-       
-    ((LSys.step rules axiom),lines,stateStack)
+let folderPyth axiom =
+    let factor = 0.005f
+    let L,LL = factor*5.0f,factor*8.0f
+    let state = [LSys.PythTree.init 400.0f 300.0f]
+    let folder (stateStack:LSys.PythTree.State list,lines) (s:LSys.PythTree.T) = 
+//        (printfn "\nINSTR: %A" s)
+//        stateStack |> List.iter (printfn "%A")
+        match stateStack with
+        | state :: t ->
+            match s with
+            | LSys.PythTree.O ->
+                let newPos = PointF(state.pos.X + float32 (Math.Cos(float state.angle*Math.PI/180.0))*L,
+                                    state.pos.Y + float32 (Math.Sin(float state.angle*Math.PI/180.0))*L)
+                ({state with pos = newPos} :: t,
+                 Array.concat([lines; [|state.pos; newPos|] ]))
+            | LSys.PythTree.I -> 
+                let newPos = PointF(state.pos.X + float32 (Math.Cos(float state.angle*Math.PI/180.0))*LL,
+                                    state.pos.Y + float32 (Math.Sin(float state.angle*Math.PI/180.0))*LL)
+                ({state with pos = newPos} :: t,
+                 Array.concat([lines; [|state.pos; newPos|] ]))
+            | LSys.PythTree.LB ->
+                let newState = { state with angle = state.angle + 45 }
+                (newState::stateStack,lines)
+            | LSys.PythTree.RB ->
+                match t with
+                | h :: t ->
+                    let newState = { h with angle = h.angle - 45 }    
+                    (newState::t,lines)
+                | _ -> (stateStack,lines)
+
+//        (stateStack,Array.empty)
+    let _finalState,lines = axiom |> Array.fold folder (state,Array.empty)
+    lines
+//    let y = (float32 i)*15.0f
+//    let w = 800.0f / float32 (Seq.length axiom)
+//    let state = List.head stateStack
+//    let lastState,lines = axiom |> Array.fold (fun (stateStack,lines) (s:LSys.PythTree.T) ->
+//        match s with
+//        | LSys.PythTree.O ->
+//            let newPos = PointF(state.pos.X + float32 (Math.Cos(state.angle))*10.0f,state.pos.Y + float32 (Math.Sin(state.angle))*10.0f)
+//            ({state with pos = newPos} :: stateStack, Array.concat([lines; [|state.pos; newPos|] ]))
+//        | LSys.PythTree.I -> 
+//            let newPos = PointF(state.pos.X + float32 (Math.Cos(state.angle))*10.0f,state.pos.Y + float32 (Math.Sin(state.angle))*20.0f)
+//            ({state with pos = newPos} :: stateStack, Array.concat([lines; [|state.pos; newPos|] ]))
+//        | LSys.PythTree.LB -> (stateStack,lines)//[||]
+//        | LSys.PythTree.RB -> (stateStack,lines) ) (stateStack,lines)
+//       
+//    ((LSys.step rules axiom),lines,stateStack)
 
 open System.Windows.Forms
 open SlimDX
@@ -145,6 +177,7 @@ open SlimDX.DXGI
 open SlimDX.Direct3D11
 open SlimDX.Direct2D
 open SlimDX.Windows
+open LSys.PythTree
 
 [<EntryPoint;STAThread>]
 let main argv = 
@@ -182,8 +215,12 @@ let main argv =
     
     form.Size = new Size(800, 600) |> ignore
     let sys = LSys.PythTree.system()
-    let f =folderPyth sys.rules
-    let _,lines,_ = [1..10] |> Seq.fold f (sys.axiom,[||],[LSys.PythTree.init 400.0f 300.0f])
+//    let f =folderPyth sys.rules
+
+    let finalDerivation = [1..13] |> Seq.fold (fun state _ -> LSys.step sys.rules state) sys.axiom //(sys.axiom,[||],[LSys.PythTree.init 400.0f 300.0f])
+    let lines = folderPyth finalDerivation //[|I;LB;O;RB;O|] //
+   
+//    let _,lines,_ = [1..10] |> Seq.fold f (sys.axiom,[||],[LSys.PythTree.init 400.0f 300.0f])
 //    let lines = [|Point(0,0); Point(800,100)|]
 
     let mainLoop () =
