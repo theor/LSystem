@@ -6,6 +6,9 @@
     printfn "elapsed: %ims" sw.ElapsedMilliseconds
     returnValue
     
+open System
+open System.Drawing
+
 type Symbol<'a> = 'a
 
 module LSys =
@@ -32,6 +35,13 @@ module LSys =
         let system() = { axiom = [| A |]
                          rules = [ A %> [|A;B;A|]
                                    B %> [|B;B;B|] ] }
+    module PythTree =
+        type State = {pos:PointF; angle:float}
+        let init x y = {pos=PointF(x,y); angle=Math.PI/2.0}
+        type T = O | I | LB | RB
+        let system() = { axiom = [| O |]
+                         rules = [ O %> [|I;LB;O;RB;O|]
+                                   I %> [|I;I|] ] }
 
 // http://peterwonka.net/Publications/pdfs/2009.VMV.Lipp.ParallelGenerationOfLSystems.final.pdf
 
@@ -91,7 +101,6 @@ open System
 //    w.Loaded.Add (fun _ ->f canvas)
 //    app.Run(window = w)
 
-open System.Drawing
 let test_sys<'a when 'a:equality> (sys:LSys.LSystem<'a>) n = 
     let folder rules axiom i =
         printfn "%i" i
@@ -110,6 +119,25 @@ let folder rules (axiom,lines) i =
             [|l1;l2|]
         else [||]) |> Array.collect id
     (LSys.step rules axiom),(Array.concat [ lines; tuples ])
+
+
+
+let folderPyth rules (axiom,lines,(stateStack:LSys.PythTree.State list)) i =
+    let y = (float32 i)*15.0f
+    let w = 800.0f / float32 (Seq.length axiom)
+    let state = List.head stateStack
+    let lastState,lines = axiom |> Array.fold (fun (stateStack,lines) s ->
+        match s with
+        | O ->
+            let newPos = PointF(state.pos.X + float32 (Math.Cos(state.angle))*10.0f,state.pos.Y + float32 (Math.Sin(state.angle))*10.0f)
+            ({state with pos = newPos} :: stateStack, Array.concat([lines; [|state.pos; newPos|] ]))
+        | I -> 
+            let newPos = PointF(state.pos.X + float32 (Math.Cos(state.angle))*10.0f,state.pos.Y + float32 (Math.Sin(state.angle))*20.0f)
+            ({state with pos = newPos} :: stateStack, Array.concat([lines; [|state.pos; newPos|] ]))
+        | LB -> (stateStack,lines)//[||]
+        | RB -> (stateStack,lines) ) (stateStack,lines)
+       
+    ((LSys.step rules axiom),lines,stateStack)
 
 open System.Windows.Forms
 open SlimDX
@@ -153,8 +181,9 @@ let main argv =
     factory.SetWindowAssociation(form.Handle, WindowAssociationFlags.IgnoreAltEnter) |> ignore
     
     form.Size = new Size(800, 600) |> ignore
-    let sys = LSys.Cantor.system()
-    let _,lines = [1..10] |> Seq.fold (folder sys.rules) (sys.axiom,[||])
+    let sys = LSys.PythTree.system()
+    let f =folderPyth sys.rules
+    let _,lines,_ = [1..10] |> Seq.fold f (sys.axiom,[||],[LSys.PythTree.init 400.0f 300.0f])
 //    let lines = [|Point(0,0); Point(800,100)|]
 
     let mainLoop () =
@@ -168,7 +197,7 @@ let main argv =
             let a = lines.[i]
             let b = lines.[i + 1]
 
-            renderTarget.DrawLine(brush, float32 a.X, float32 a.Y, float32 b.X, float32 b.Y, 10.1f)
+            renderTarget.DrawLine(brush, float32 a.X, float32 a.Y, float32 b.X, float32 b.Y, 1.1f)
 
         renderTarget.EndDraw() |> ignore
 
