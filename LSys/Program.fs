@@ -10,7 +10,6 @@ open System
 open System.Drawing
 open LSystem
 
-
 // http://peterwonka.net/Publications/pdfs/2009.VMV.Lipp.ParallelGenerationOfLSystems.final.pdf
 
 let test_sys<'a when 'a:equality> (sys:LSystem<'a>) n = 
@@ -74,13 +73,8 @@ open PythTree
 let main argv = 
     let make() =
         let sys = PythTree.system()
-//    let f =folderPyth sys.rules
 
-        let finalDerivation = [1..10] |> Seq.fold (fun state _ -> step sys.rules state) sys.axiom //(sys.axiom,[||],[PythTree.init 400.0f 300.0f])
+        let finalDerivation = [1..10] |> Seq.fold (fun state _ -> step sys.rules state) sys.axiom
         folderPyth finalDerivation //[|I;LB;O;RB;O|] //
     Renderer.run(make)
-
-
-//    duration (fun () -> test_sys (Cantor.system()) 14)
-//    runApp (fun canvas -> [1..10] |> Seq.fold (folder canvas sys.rules) sys.axiom |> ignore)
     0
