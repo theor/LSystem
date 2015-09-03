@@ -1,5 +1,9 @@
 source https://nuget.org/api/v2
 
+nuget SlimDX
+
 nuget FsUnit
 nuget NUnit
-nuget SlimDX
+nuget NUnitTestAdapter
+nuget FsCheck
+nuget FsCheck.NUnit

@@ -74,7 +74,7 @@ let main argv =
     let make() =
         let sys = PythTree.system()
 
-        let finalDerivation = [1..10] |> Seq.fold (fun state _ -> step (Map.toList sys.rules) state) sys.axiom
+        let finalDerivation = [1..13] |> Seq.fold (fun state _ -> step (Map.toList sys.rules) state) sys.axiom
         folderPyth finalDerivation //[|I;LB;O;RB;O|] //
     Renderer.run(make)
     0

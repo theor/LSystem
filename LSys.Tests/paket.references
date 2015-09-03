@@ -1,2 +1,5 @@
 NUnit
+NUnitTestAdapter
 FsUnit
+FsCheck
+FsCheck.NUnit

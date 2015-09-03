@@ -6,9 +6,11 @@ open Microsoft.FSharp.Reflection
 type Symbol<'a> = 'a
 
 type Rule<'a when 'a:equality> = Symbol<'a> * (Symbol<'a> array)
+type Rules<'a when 'a:equality and 'a:comparison> = Map<Symbol<'a>,Symbol<'a> array>
+type Axiom<'a when 'a:equality and 'a:comparison> = Symbol<'a> array
 type LSystem<'a when 'a:equality and 'a:comparison> =
-    { axiom: Symbol<'a> array
-      rules: Map<Symbol<'a>,Symbol<'a> array> }
+    { axiom: Axiom<'a>
+      rules: Rules<'a> }
 module LSystem =
         let create axiom rules =
             { axiom = axiom
@@ -22,14 +24,53 @@ let matchRules rules x =
 
 let step rules axiom =
     axiom |> Array.collect (matchRules rules)
-type HigherStepper<'a when 'a:equality and 'a:comparison>(sys:LSystem<'a>) =
+
+type HigherStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>) =
     let tagr = FSharpValue.PreComputeUnionTagReader typeof<'a>
     let countCache =
-        sys.rules |> Map.toArray |> Array.map (fun (k,v) -> tagr k,Array.length v) |> Map.ofArray
+        rules |> Map.toArray |> Array.map (fun (k,v) -> tagr k,Array.length v) |> Map.ofArray
 
-    let count axiom = axiom |> Array.map (fun x -> Map.find (tagr x) countCache)
-    let scanCount (count:int[]) = count |> Array.scan (fun s x -> s+x) 0
+    member x.count(axiom) =
+        axiom |> Array.map (fun x -> match Map.tryFind (tagr x) countCache with
+                                     | None -> 0
+                                     | Some v -> v)
+              
+    member x.scanCount (count:int[]) =
+        if Array.isEmpty count then Array.empty
+        else count |> Array.take (Array.length count - 1) |> Array.scan (fun s x -> s+x) 0
+#nowarn "40"
+module Messages =
+    type Count = {offset:int; length:int}
+    type ParMessage<'a when 'a:equality and 'a:comparison> =
+    | Count of Count * Axiom<'a> * AsyncReplyChannel<int[]>
 
+type ParallelStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>, n:int) =
+    let tagr = FSharpValue.PreComputeUnionTagReader typeof<'a>
+    let countCache =
+        rules |> Map.toArray |> Array.map (fun (k,v) -> tagr k,Array.length v) |> Map.ofArray
+    let createActor(i) =
+        MailboxProcessor.Start(fun inbox ->
+            let rec loop = async {
+                let! msg = inbox.Receive()
+                match msg with
+                | Messages.Count(c,axiom, reply) ->
+                    let counts = Array.sub axiom c.offset c.length
+                                 |> Array.map (fun x -> match Map.tryFind (tagr x) countCache with
+                                                        | None -> 0
+                                                        | Some v -> v)
+                    reply.Reply counts
+                return! loop
+            }
+            loop)
+    let actors = Array.init n createActor
+    member x.count(axiom) =
+        axiom |> Array.map (fun x -> match Map.tryFind (tagr x) countCache with
+                                     | None -> 0
+                                     | Some v -> v)
+              
+    member x.scanCount (count:int[]) =
+        if Array.isEmpty count then Array.empty
+        else count |> Array.take (Array.length count - 1) |> Array.scan (fun s x -> s+x) 0
 module Algea =
     type T = A | B
 //    type TT = X | Z | Y of int
