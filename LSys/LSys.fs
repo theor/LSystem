@@ -54,7 +54,9 @@ type ParallelStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>, n:i
                 let! msg = inbox.Receive()
                 match msg with
                 | Messages.Count(c,axiom, reply) ->
-                    let counts = Array.sub axiom c.offset c.length
+                    let diff = c.offset + c.length - Array.length axiom
+                    let len = if diff <= 0 then c.length else c.length - diff
+                    let counts = Array.sub axiom c.offset len
                                  |> Array.map (fun x -> match Map.tryFind (tagr x) countCache with
                                                         | None -> 0
                                                         | Some v -> v)
@@ -63,10 +65,15 @@ type ParallelStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>, n:i
             }
             loop)
     let actors = Array.init n createActor
-    member x.count(axiom) =
-        axiom |> Array.map (fun x -> match Map.tryFind (tagr x) countCache with
-                                     | None -> 0
-                                     | Some v -> v)
+    member x.count(axiom:Axiom<'a>) =
+        let m = (1 + Array.length axiom) / n
+        let actorCount i rep = Messages.Count({offset=i*m;length=m}, axiom, rep)
+        actors |> Array.mapi (fun i a -> a.PostAndAsyncReply(actorCount i)) |> Async.Parallel |> Async.RunSynchronously |> Array.concat
+//        axiom |> Array.chunkBySize sliceLength
+//              |> Array.mapi (fun i chunk -> actors.[i].PostAndAsyncReply(fun rep -> Messages.Count())
+//        axiom |> Array.map (fun x -> match Map.tryFind (tagr x) countCache with
+//                                     | None -> 0
+//                                     | Some v -> v)
               
     member x.scanCount (count:int[]) =
         if Array.isEmpty count then Array.empty
