@@ -12,12 +12,12 @@ open LSystem
 
 // http://peterwonka.net/Publications/pdfs/2009.VMV.Lipp.ParallelGenerationOfLSystems.final.pdf
 
-let test_sys<'a when 'a:equality> (sys:LSystem<'a>) n = 
+let test_sys<'a when 'a:equality and 'a:comparison> (sys:LSystem<'a>) n = 
     let folder rules axiom i =
         printfn "%i" i
 //        printfn "%i %A" i (sys.axiom |> List.map (sprintf "%A") |> String.concat "")
         step rules axiom
-    let final = [1..n] |> Seq.fold (folder sys.rules) sys.axiom
+    let final = [1..n] |> Seq.fold (folder (sys.rules |> Map.toList)) sys.axiom
     final |> Array.map (sprintf "%O")|> printfn "%O"
 //    algea() |> test_sys
 let folder rules (axiom,lines) i =
@@ -74,7 +74,7 @@ let main argv =
     let make() =
         let sys = PythTree.system()
 
-        let finalDerivation = [1..10] |> Seq.fold (fun state _ -> step sys.rules state) sys.axiom
+        let finalDerivation = [1..10] |> Seq.fold (fun state _ -> step (Map.toList sys.rules) state) sys.axiom
         folderPyth finalDerivation //[|I;LB;O;RB;O|] //
     Renderer.run(make)
     0

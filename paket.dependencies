@@ -1,3 +1,5 @@
 source https://nuget.org/api/v2
 
+nuget FsUnit
+nuget NUnit
 nuget SlimDX
