@@ -54,7 +54,7 @@
       <Paket>True</Paket>
     </Compile>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Library1.fs" />
+    <Compile Include="StepperTests.fs" />
     <None Include="Script.fsx" />
     <None Include="paket.references" />
     <Content Include="App.config" />

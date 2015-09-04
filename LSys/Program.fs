@@ -17,7 +17,7 @@ let test_sys<'a when 'a:equality and 'a:comparison> (sys:LSystem<'a>) n =
         printfn "%i" i
 //        printfn "%i %A" i (sys.axiom |> List.map (sprintf "%A") |> String.concat "")
         step rules axiom
-    let final = [1..n] |> Seq.fold (folder (sys.rules |> Map.toList)) sys.axiom
+    let final = [1..n] |> Seq.fold (folder sys.rules) sys.axiom
     final |> Array.map (sprintf "%O")|> printfn "%O"
 //    algea() |> test_sys
 let folder rules (axiom,lines) i =
@@ -74,7 +74,7 @@ let main argv =
     let make() =
         let sys = PythTree.system()
 
-        let finalDerivation = [1..13] |> Seq.fold (fun state _ -> step (Map.toList sys.rules) state) sys.axiom
+        let finalDerivation = [1..1] |> Seq.fold (fun state _ -> step (sys.rules) state) sys.axiom
         folderPyth finalDerivation //[|I;LB;O;RB;O|] //
     Renderer.run(make)
     0

@@ -17,67 +17,15 @@ module LSystem =
               rules = Map.ofList rules }
 let inline (%>) pred succ = (pred, succ)
 let matchRules rules x =
-    let matching = rules |> List.tryFind (fun (pred,_) -> pred = x)
+    let matching = rules |> Map.tryFind x
     match matching with
     | None -> [|x|]
-    | Some (pred,succ) -> succ
+    | Some succ -> succ
 
 let step rules axiom =
     axiom |> Array.collect (matchRules rules)
 
-type HigherStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>) =
-    let tagr = FSharpValue.PreComputeUnionTagReader typeof<'a>
-    let countCache =
-        rules |> Map.toArray |> Array.map (fun (k,v) -> tagr k,Array.length v) |> Map.ofArray
 
-    member x.count(axiom) =
-        axiom |> Array.map (fun x -> match Map.tryFind (tagr x) countCache with
-                                     | None -> 0
-                                     | Some v -> v)
-              
-    member x.scanCount (count:int[]) =
-        if Array.isEmpty count then Array.empty
-        else count |> Array.take (Array.length count - 1) |> Array.scan (fun s x -> s+x) 0
-#nowarn "40"
-module Messages =
-    type Count = {offset:int; length:int}
-    type ParMessage<'a when 'a:equality and 'a:comparison> =
-    | Count of Count * Axiom<'a> * AsyncReplyChannel<int[]>
-
-type ParallelStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>, n:int) =
-    let tagr = FSharpValue.PreComputeUnionTagReader typeof<'a>
-    let countCache =
-        rules |> Map.toArray |> Array.map (fun (k,v) -> tagr k,Array.length v) |> Map.ofArray
-    let createActor(i) =
-        MailboxProcessor.Start(fun inbox ->
-            let rec loop = async {
-                let! msg = inbox.Receive()
-                match msg with
-                | Messages.Count(c,axiom, reply) ->
-                    let diff = c.offset + c.length - Array.length axiom
-                    let len = if diff <= 0 then c.length else c.length - diff
-                    let counts = Array.sub axiom c.offset len
-                                 |> Array.map (fun x -> match Map.tryFind (tagr x) countCache with
-                                                        | None -> 0
-                                                        | Some v -> v)
-                    reply.Reply counts
-                return! loop
-            }
-            loop)
-    let actors = Array.init n createActor
-    member x.count(axiom:Axiom<'a>) =
-        let m = (1 + Array.length axiom) / n
-        let actorCount i rep = Messages.Count({offset=i*m;length=m}, axiom, rep)
-        actors |> Array.mapi (fun i a -> a.PostAndAsyncReply(actorCount i)) |> Async.Parallel |> Async.RunSynchronously |> Array.concat
-//        axiom |> Array.chunkBySize sliceLength
-//              |> Array.mapi (fun i chunk -> actors.[i].PostAndAsyncReply(fun rep -> Messages.Count())
-//        axiom |> Array.map (fun x -> match Map.tryFind (tagr x) countCache with
-//                                     | None -> 0
-//                                     | Some v -> v)
-              
-    member x.scanCount (count:int[]) =
-        if Array.isEmpty count then Array.empty
-        else count |> Array.take (Array.length count - 1) |> Array.scan (fun s x -> s+x) 0
 module Algea =
     type T = A | B
 //    type TT = X | Z | Y of int
