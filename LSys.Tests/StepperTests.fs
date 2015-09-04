@@ -85,10 +85,7 @@ module ``Test scancount`` =
                                                                  ("   par", parPythStepper.step)]
 
     let [<Test>] ``step 100 elements``() =
-        stepNElements 100 100
-        stepNElements 100 1000
-        stepNElements 100 10000
-        stepNElements 100 100000
+        [100;1000;10000;100000] |> List.iter (stepNElements 100)
 
 
 
