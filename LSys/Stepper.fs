@@ -22,7 +22,7 @@ type HigherStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>) =
 
     member x.count(axiom) =
         axiom |> Array.map (fun x -> match Map.tryFind (countCache.tagr x) countCache.cache with
-                                     | None -> 0
+                                     | None -> 1
                                      | Some v -> v)
     member x.step(axiom) =
         let counts = x.count axiom
@@ -42,6 +42,7 @@ module Messages =
 
 type ActorStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>, n:int) =
     let countCache = CountCache<Symbol<'a>>(rules)
+
     let createActor(i) =
         MailboxProcessor.Start(fun inbox ->
             let rec loop = async {
@@ -52,20 +53,27 @@ type ActorStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>, n:int)
                     let len = if diff <= 0 then c.length else c.length - diff
                     let counts = Array.sub axiom c.offset len
                                  |> Array.map (fun x -> match Map.tryFind (countCache.tagr x) countCache.cache with
-                                                        | None -> 0
+                                                        | None -> 1
                                                         | Some v -> v)
                     reply.Reply counts
                 return! loop
             }
             loop)
+
     let actors = Array.init n createActor
+
     member x.count(axiom:Axiom<'a>) =
         let m = (1 + Array.length axiom) / n
         let actorCount i rep = Messages.Count({offset=i*m;length=m}, axiom, rep)
         actors |> Array.mapi (fun i a -> a.PostAndAsyncReply(actorCount i)) |> Async.Parallel |> Async.RunSynchronously |> Array.concat
-//        axiom |> Array.chunkBySize sliceLength
-//              |> Array.mapi (fun i chunk -> actors.[i].PostAndAsyncReply(fun rep -> Messages.Count())
-//        axiom |> Array.map (fun x -> match Map.tryFind (tagr x) countCache with
-//                                     | None -> 0
-//                                     | Some v -> v)
+
+    member x.step(axiom) =
+        let counts = x.count axiom
+        let scanCounts,total = scanCount counts
+        let mutable res = Array.zeroCreate total
+        let set i offset =
+            let succ = LSystem.matchRules rules (axiom.[i])
+            succ |> Array.iteri (fun j sym -> Array.set res (offset+j) sym)
+        scanCounts |> Array.iteri set
+        res
               

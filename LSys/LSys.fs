@@ -28,11 +28,6 @@ let step rules axiom =
 
 module Algea =
     type T = A | B
-//    type TT = X | Z | Y of int
-//    let m = Map.ofList [(X,1);(Y(2),2)]
-//    let un = FSharp.Reflection.FSharpType.GetUnionCases(typeof<TT>)
-//    let tagr = FSharp.Reflection.FSharpValue.PreComputeUnionTagReader(typeof<TT>)
-//    m.Item X
     let system() = LSystem.create [| A |] [ A %> [|A;B|]
                                             B %> [|A|] ]
 module Cantor =
