@@ -66,14 +66,16 @@ type ActorStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>, n:int)
         let m = (1 + Array.length axiom) / n
         let actorCount i rep = Messages.Count({offset=i*m;length=m}, axiom, rep)
         actors |> Array.mapi (fun i a -> a.PostAndAsyncReply(actorCount i)) |> Async.Parallel |> Async.RunSynchronously |> Array.concat
-
-    member x.step(axiom) =
-        let counts = x.count axiom
-        let scanCounts,total = scanCount counts
+    member x.doStep(scanCounts,total,axiom:Axiom<'a>) =
         let mutable res = Array.zeroCreate total
         let set i offset =
             let succ = LSystem.matchRules rules (axiom.[i])
             succ |> Array.iteri (fun j sym -> Array.set res (offset+j) sym)
         scanCounts |> Array.iteri set
         res
+    member x.step(axiom) =
+        let counts = x.count axiom
+        let scanCounts,total = scanCount counts
+        x.doStep(scanCounts,total,axiom)
+ 
               

@@ -44,7 +44,7 @@ let run(makeLines:unit -> PointF[]) =
     
     form.Size = new Size(800, 600) |> ignore
 
-    let lines = duration makeLines
+    let lines = durationp makeLines
    
 //    let _,lines,_ = [1..10] |> Seq.fold f (sys.axiom,[||],[LSys.PythTree.init 400.0f 300.0f])
 //    let lines = [|Point(0,0); Point(800,100)|]

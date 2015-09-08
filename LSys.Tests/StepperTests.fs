@@ -6,17 +6,11 @@ open FsCheck
 open FsCheck.NUnit
 open LSystem
 open Stepper
+open LSystem.PythTree
+
 
 module ``Test scancount`` =
-    let duration f =
-        let sw = System.Diagnostics.Stopwatch()
-        sw.Start()
-        let returnValue = f()
-        sw.Stop()
-    //    printfn "elapsed: %ims" sw.ElapsedMilliseconds
-        returnValue,sw.Elapsed.TotalMilliseconds
 
-    open LSystem.PythTree
     [<Test>]
     let testCount() =
         let sys = PythTree.system()
@@ -69,7 +63,7 @@ module ``Test scancount`` =
         let higherStepped = parPythStepper.step xs.Get
         basicStepped = higherStepped
 
-    // timing
+module Timing =
     module Avg =
         let avg axioms f = axioms |> Seq.averageBy (fun axiom ->
             let res,time = duration (fun () -> f axiom)
@@ -77,15 +71,49 @@ module ``Test scancount`` =
         let compare title axioms cases =
             printfn "%s:" title
             cases |> List.iter (fun (label,f) -> avg axioms f |> printfn "%s: %fms" label)
-    let stepNElements n size =
+    let pythSys = PythTree.system()
+    let pythStepper = HigherStepper(pythSys.rules)
+    let parPythStepper = ActorStepper(pythSys.rules, 2)
+    let parPythStepper4 = ActorStepper(pythSys.rules, 8)
+
+    let countNElements n size =
         let axiomGen = Gen.arrayOfLength n (Gen.arrayOfLength size Arb.generate<PythTree.T>)
         let axioms = Gen.eval 100 (Random.mkStdGen 42L) axiomGen
-        Avg.compare (sprintf "Step 100 %i-symbols" size) axioms [(" naive", LSystem.step pythSys.rules)
-                                                                 ("higher", pythStepper.step)
-                                                                 ("   par", parPythStepper.step)]
+        Avg.compare (sprintf "Step 100 %i-symbols" size) axioms [
+                                                                 ("higher", pythStepper.count)
+                                                                 ("   par", parPythStepper.count)
+                                                                 ("  par4", parPythStepper4.count)]
+    let scancountNElements n size =
+        let axiomGen = Gen.arrayOfLength n (Gen.arrayOfLength size Arb.generate<PythTree.T>)
+        let axioms = Gen.eval 100 (Random.mkStdGen 42L) axiomGen |> Array.map parPythStepper4.count
+        Avg.compare (sprintf "Step 100 %i-symbols" size) axioms [("higher", Stepper.scanCount)]
+        
 
+    let stepNElements n testcases size =
+        let axiomGen = Gen.arrayOfLength n (Gen.arrayOfLength size Arb.generate<PythTree.T>)
+        let axioms = Gen.eval 100 (Random.mkStdGen 42L) axiomGen
+        Avg.compare (sprintf "Step 100 %i-symbols" size) axioms testcases
+
+    let [<Test>] ``count 100 elements``() =
+        [100;1000;10000] |> List.iter (countNElements 100)
+    let [<Test>] ``scancount 100 elements``() =
+        [100;1000;10000] |> List.iter (scancountNElements 100)
     let [<Test>] ``step 100 elements``() =
-        [100;1000;10000;100000] |> List.iter (stepNElements 100)
+        let testcases = [(" naive", LSystem.step pythSys.rules)
+                         ("higher", pythStepper.step)
+                         ("   par", parPythStepper.step)
+                         ("  par8", parPythStepper4.step)]
+        [100;1000;10000] |> List.iter (stepNElements 100 testcases) 
+
+    let axiomSizes,axiomNumber = [10000],100
+    let [<Test>] ``step 100 elements naive``() =
+        axiomSizes |> List.iter (stepNElements axiomNumber [(" naive", LSystem.step pythSys.rules)]) 
+    let [<Test>] ``step 100 elements higher``() =
+        axiomSizes |> List.iter (stepNElements axiomNumber [("higher", pythStepper.step)])
+    let [<Test>] ``step 100 elements par``() =
+        axiomSizes |> List.iter (stepNElements axiomNumber [("   par", parPythStepper.step)]) 
+    let [<Test>] ``step 100 elements par8``() =
+        axiomSizes |> List.iter (stepNElements axiomNumber [("  par8", parPythStepper4.step)]) 
 
 
 
