@@ -14,8 +14,8 @@ module ``Test scancount`` =
     [<Test>]
     let testCount() =
         let sys = PythTree.system()
-        let s = HigherStepper(sys.rules)
-        let ps = ActorStepper(sys.rules, 2)
+        let s = HigherStepper(sys.rules, sys.count)
+        let ps = ActorStepper(sys.rules, sys.count, 2)
         let s0 = [|I;LB;O;RB;O|]
         let count = s.count s0
         let pcount = ps.count s0
@@ -29,7 +29,7 @@ module ``Test scancount`` =
         1 |> should equal 1
 
     let pythSys = PythTree.system()
-    let pythStepper = HigherStepper(pythSys.rules)
+    let pythStepper = HigherStepper(pythSys.rules, pythSys.count)
 
     [<Property(Verbose=false)>]
     let ``sum count[0:-2] = scanCount[-1]`` (xs:NonEmptyArray<PythTree.T>) =
@@ -49,7 +49,7 @@ module ``Test scancount`` =
         let higherStepped,highertime = duration (fun () -> pythStepper.step xs.Get)
         basicStepped = higherStepped |> Prop.collect (basictime > highertime)
         
-    let parPythStepper = ActorStepper(pythSys.rules, 2)
+    let parPythStepper = ActorStepper(pythSys.rules, pythSys.count, 2)
 
     [<Property(Verbose=false)>]
     let ``parallel stepper count works`` (xs:NonEmptyArray<PythTree.T>) =
@@ -72,9 +72,9 @@ module Timing =
             printfn "%s:" title
             cases |> List.iter (fun (label,f) -> avg axioms f |> printfn "%s: %fms" label)
     let pythSys = PythTree.system()
-    let pythStepper = HigherStepper(pythSys.rules)
-    let parPythStepper = ActorStepper(pythSys.rules, 2)
-    let parPythStepper4 = ActorStepper(pythSys.rules, 8)
+    let pythStepper = HigherStepper(pythSys.rules, pythSys.count)
+    let parPythStepper = ActorStepper(pythSys.rules, pythSys.count, 2)
+    let parPythStepper4 = ActorStepper(pythSys.rules, pythSys.count, 8)
 
     let countNElements n size =
         let axiomGen = Gen.arrayOfLength n (Gen.arrayOfLength size Arb.generate<PythTree.T>)

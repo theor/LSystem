@@ -14,16 +14,16 @@ let test_sys<'a when 'a:equality and 'a:comparison> (sys:LSystem<'a>) n =
     let final = [1..n] |> Seq.fold (folder sys.rules) sys.axiom
     final |> Array.map (sprintf "%O")|> printfn "%O"
 //    algea() |> test_sys
-let folder rules (axiom,lines) i =
-    let y = (float32 i)*15.0f
-    let w = 800.0f / float32 (Seq.length axiom)
-    let tuples = axiom |> Array.mapi (fun j s ->
-        if s = Cantor.A then
-            let l1 = PointF(w*float32 j,y)
-            let l2 = PointF(w*float32 j+w,y)//,Stroke=Brushes.Black,StrokeThickness=40.0)
-            [|l1;l2|]
-        else [||]) |> Array.collect id
-    (step rules axiom),(Array.concat [ lines; tuples ])
+//let folder rules (axiom,lines) i =
+//    let y = (float32 i)*15.0f
+//    let w = 800.0f / float32 (Seq.length axiom)
+//    let tuples = axiom |> Array.mapi (fun j s ->
+//        if s = Cantor.A then
+//            let l1 = PointF(w*float32 j,y)
+//            let l2 = PointF(w*float32 j+w,y)//,Stroke=Brushes.Black,StrokeThickness=40.0)
+//            [|l1;l2|]
+//        else [||]) |> Array.collect id
+//    (step rules axiom),(Array.concat [ lines; tuples ])
 
 
 
@@ -66,11 +66,11 @@ open PythTree
 
 [<EntryPoint;STAThread>]
 let main argv = 
-    let make() =
-        let sys = PythTree.system()
-        let stepper = Stepper.HigherStepper(sys.rules)
-        let pstepper = Stepper.ActorStepper(sys.rules, 4)
-        let finalDerivation = [1..13] |> Seq.fold (fun state _ -> stepper.step state) sys.axiom
-        folderPyth finalDerivation //[|I;LB;O;RB;O|] //
-    Renderer.run(make)
+//    let make() =
+//        let sys = PythTree.system()
+//        let stepper = Stepper.HigherStepper(sys.rules)
+//        let pstepper = Stepper.ActorStepper(sys.rules, 4)
+//        let finalDerivation = [1..13] |> Seq.fold (fun state _ -> stepper.step state) sys.axiom
+//        folderPyth finalDerivation //[|I;LB;O;RB;O|] //
+//    Renderer.run(make)
     0
