@@ -46,21 +46,24 @@ module PythTree =
                                      I %> [|I;I|] ]
 
 (* ALT IMPL 2 *)
-type Rule2<'a when 'a:equality and 'a:comparison> = (('a -> bool) * Symbol<'a> array)
 type LSystem2<'a when 'a:equality and 'a:comparison> =
     { axiom: Axiom<'a>
-      rules: Rule2<'a> list }
+      rules: ('a -> 'a[])
+      count: ('a -> int) }
 module LSystem2 =
-        let create axiom rules =
+        let create axiom rules count =
             { axiom = axiom
-              rules = rules }
+              rules = rules
+              count = count }
 module PythTree2 =
     type State = {pos:PointF; angle:int}
     let init x y = {pos=PointF(x,y); angle=0}
     type T = O | I | LB | RB
-    let system() =  LSystem2.create [| O |]
-                                   [ (function | O -> true | _ -> false)  %> [|I;LB;O;RB;O|]
-                                     (function | I -> true | _ -> false) %> [|I;I|] ]
+    let rules f s = match s with
+                    | O -> f [|I;LB;O;RB;O|]
+                    | I -> f [|I;I|]
+                    | x -> f [|x|]
+    let system(f) =  LSystem2.create [| O |] (rules id) (rules Array.length)
 
 (* ALT IMPL 3 *)
 type RuleResult<'a when 'a:equality and 'a:comparison> = Res of Symbol<'a> array
@@ -80,16 +83,3 @@ module PythTree3 =
                                    (function | O -> Res [|I;LB;O;RB;O|]
                                              | I -> Res [|I;I|]
                                              | x -> Res [|x|])
-    let f = <@ function | O -> Res [|I;LB;O;RB;O|] | I when 4 = 2 -> Res [||] | I -> Res [|I;I|] | x -> Res [|x|] @>
-    open FSharp.Quotations
-    open FSharp.Quotations.Patterns
-    open FSharp.Quotations.DerivedPatterns
-    open FSharp.Quotations.ExprShape
-    let rec recognizePlus' quotation =
-        match quotation with
-        | UnionCaseTest x -> printfn "UnionCaseTest %A" quotation; ()
-        | ShapeVar v -> ()
-        | ShapeLambda (v,expr) -> recognizePlus' expr
-        | ShapeCombination (o, exprs) -> List.map recognizePlus' exprs |> ignore
-    let an<'a> (f:Quotations.Expr<('a -> 'a[])>) = recognizePlus' f
-    an f
