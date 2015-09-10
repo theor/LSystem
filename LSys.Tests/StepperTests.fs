@@ -8,7 +8,26 @@ open LSystem
 open Stepper
 open LSystem.PythTree
 
+module ``Higher Stepper 2`` =
+    let pythSys = PythTree.system()
+    let pythStepper2 = HigherStepper2(pythSys.rules, pythSys.count,1)
+    let pythStepper22 = HigherStepper2(pythSys.rules, pythSys.count,2)
+    
+    [<Property(Verbose=false)>]
+    let ``count is split in 1 chunks`` (xs:NonEmptyArray<PythTree.T>) =
+        let c = pythStepper2.count xs.Get
+        Array.length c = pythStepper2.n
+    [<Property(Verbose=false)>]
+    let ``count is split in 2 chunks`` (xs:NonEmptyArray<PythTree.T>) =
+        let c = pythStepper22.count xs.Get
+        Array.length c = pythStepper22.n
 
+
+    [<Property(Verbose=false)>]
+    let ``step2`` (xs:NonEmptyArray<PythTree.T>) =
+        let basicStepped,basictime = duration (fun () -> LSystem.step pythSys.rules xs.Get)
+        let higherStepped,highertime = duration (fun () -> pythStepper2.step xs.Get)
+        basicStepped = higherStepped |> Prop.collect (basictime > highertime)
 module ``Test scancount`` =
 
     [<Test>]
@@ -25,8 +44,10 @@ module ``Test scancount`` =
         printfn "scancount: %A" scanScount
         
         let s1 = LSystem.step sys.rules s0
-        let s1' = s.step s0
-        1 |> should equal 1
+        let s1' = ps.step s0
+        printfn "     step: %A" s1
+        printfn "  parstep: %A" s1'
+        s1' |> should equal s1
 
     let pythSys = PythTree.system()
     let pythStepper = HigherStepper(pythSys.rules, pythSys.count)
@@ -73,6 +94,7 @@ module Timing =
             cases |> List.iter (fun (label,f) -> avg axioms f |> printfn "%s: %fms" label)
     let pythSys = PythTree.system()
     let pythStepper = HigherStepper(pythSys.rules, pythSys.count)
+    let pythStepper2 = HigherStepper2(pythSys.rules, pythSys.count,1)
     let parPythStepper = ActorStepper(pythSys.rules, pythSys.count, 2)
     let parPythStepper4 = ActorStepper(pythSys.rules, pythSys.count, 8)
 
@@ -81,6 +103,7 @@ module Timing =
         let axioms = Gen.eval 100 (Random.mkStdGen 42L) axiomGen
         Avg.compare (sprintf "Step 100 %i-symbols" size) axioms [
                                                                  ("higher", pythStepper.count)
+                                                                 ("highe2", pythStepper2.count)
                                                                  ("   par", parPythStepper.count)
                                                                  ("  par4", parPythStepper4.count)]
     let scancountNElements n size =
@@ -105,11 +128,13 @@ module Timing =
                          ("  par8", parPythStepper4.step)]
         [100;1000;10000] |> List.iter (stepNElements 100 testcases) 
 
-    let axiomSizes,axiomNumber = [10000],100
+    let axiomSizes,axiomNumber = [10;100;1000;10000],100
     let [<Test>] ``step 100 elements naive``() =
         axiomSizes |> List.iter (stepNElements axiomNumber [(" naive", LSystem.step pythSys.rules)]) 
     let [<Test>] ``step 100 elements higher``() =
         axiomSizes |> List.iter (stepNElements axiomNumber [("higher", pythStepper.step)])
+    let [<Test>] ``step 100 elements higher2``() =
+        axiomSizes |> List.iter (stepNElements axiomNumber [("highe2", pythStepper2.step)])
     let [<Test>] ``step 100 elements par``() =
         axiomSizes |> List.iter (stepNElements axiomNumber [("   par", parPythStepper.step)]) 
     let [<Test>] ``step 100 elements par8``() =

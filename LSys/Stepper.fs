@@ -21,14 +21,43 @@ type HigherStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>,counte
             succ |> Array.iteri (fun j sym -> Array.set res (offset+j) sym)
         scanCounts |> Array.iteri set
         res
-        
+ type HigherStepper2<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>,counter:Counter<'a>,n:int) =
+    let log format = Printf.kprintf (fun _ -> ()) format
+//    let log format = Printf.printfn format
+    member val n = n
+    member x.count(axiom) =
+        let l = Array.length axiom
+        log "axiom %A %i" axiom l
+        let m = (l + 1) / n
+        log "    chunk size %i" m
+
+        let res = (Array.zeroCreate n)
+        for i = 0 to n - 1 do
+            let delta = l - (i+1)*m
+            let chunkLength = if delta < 0 then m + delta else m
+            let start = i*m
+            log "    chunk @%i:%i" start chunkLength
+            let count = Array.sub axiom start chunkLength |> Array.sumBy counter
+            Array.set res i count
+            ()
+        log "        %A" res
+        res
+    member x.step(axiom) =
+        let counts = x.count axiom
+        let scanCounts,total = scanCount counts
+        let res = Array.zeroCreate total
+        let set i offset =
+            let succ = rules (axiom.[i])
+            succ |> Array.iteri (fun j sym -> Array.set res (offset+j) sym)
+        scanCounts |> Array.iteri set
+        res       
 #nowarn "40"
 module Messages =
     type Count = {offset:int; length:int}
     type ParMessage<'a when 'a:equality and 'a:comparison> =
     | Count of Count * Axiom<'a> * AsyncReplyChannel<int[]>
     | Step of  Count * Axiom<'a> * AsyncReplyChannel<'a[]>
-    | StepRef of Count * Axiom<'a> * 'a[] ref * AsyncReplyChannel<bool>
+    | StepRef of Count * Axiom<'a> * int[] * 'a[] ref * AsyncReplyChannel<bool>
 
 type ActorStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>,counter:Counter<'a>, n:int) =
     let createActor(i) =
@@ -48,15 +77,18 @@ type ActorStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>,counter
                     let stepped = Array.sub axiom c.offset len
                                  |> Array.collect rules
                     reply.Reply stepped
-                | Messages.StepRef(c,axiom:Axiom<'a>,res,reply) ->
+                | Messages.StepRef(c,axiom:Axiom<'a>,scanCounts,res,reply) ->
                     let diff = c.offset + c.length - Array.length axiom
                     let len = if diff <= 0 then c.length else c.length - diff
+                    let sc = Array.sub scanCounts c.offset len
                     let set i offset =
-                        let succ = rules (axiom.[i])
-                        succ |> Array.iteri (fun j sym -> Array.set !res (offset+j) sym)
-                    let stepped = Array.sub axiom c.offset len |> Array.collect rules
-                    set c.
-//                    |> Array.iteri set
+                        let succ = rules (axiom.[c.offset+i])
+                        for j = 0 to -1+Array.length succ do
+                            Array.set !res (offset+j) (succ.[j])
+//                        succ |> Array.iteri (fun j sym -> Array.set !res (offset+j) sym)
+//                    for isc = 0 to len-1 do
+//                        set isc scanCounts.[c.offset + isc]
+//                    sc |> Array.iteri set
                     reply.Reply true
                     
                 return! loop
@@ -76,8 +108,10 @@ type ActorStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>,counter
     member x.doStepRef(scanCounts,total,axiom:Axiom<'a>) =
         let m = (1 + Array.length axiom) / n
         let res = ref (Array.zeroCreate total)
-        let actorStep i rep = Messages.StepRef({offset=i*m;length=m}, axiom, res, rep)
-        actors |> Array.mapi (fun i a -> a.PostAndAsyncReply(actorStep i)) |> Async.Parallel |> Async.RunSynchronously |> ignore
+        let actorStep i rep = Messages.StepRef({offset=i*m;length=m}, axiom, scanCounts, res, rep)
+        
+        actors |> Array.mapi (fun i a -> a.PostAndAsyncReply(actorStep i)) |> Async.Parallel |> Async.RunSynchronously   |> ignore
+        !res
 //        let mutable res = Array.zeroCreate total
 //        let set i offset =
 //            let succ = rules (axiom.[i])
@@ -88,5 +122,5 @@ type ActorStepper<'a when 'a:equality and 'a:comparison>(rules:Rules<'a>,counter
         let counts = x.count axiom
         let scanCounts,total = scanCount counts
         x.doStepRef(scanCounts,total,axiom)
- 
+        
               

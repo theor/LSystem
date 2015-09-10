@@ -25,7 +25,7 @@ let matchRules rules x =
     | Some succ -> succ
 
 let step rules axiom =
-    axiom |> Array.collect (rules)
+    axiom |> Array.Parallel.collect (rules)
 
 
 //module Algea =
