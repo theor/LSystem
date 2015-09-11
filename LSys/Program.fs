@@ -28,10 +28,12 @@ let test_sys<'a when 'a:equality and 'a:comparison> (sys:LSystem<'a>) n =
 
 
 let folderPyth axiom =
+    let totalVertices = axiom |> Array.sumBy (function | PythTree.O | PythTree.I -> 2 | _ -> 0)
+    let lines = Array.zeroCreate totalVertices
     let factor = 0.005f
     let L,LL = factor*5.0f,factor*8.0f
     let state = [PythTree.init 400.0f 300.0f]
-    let folder (stateStack:PythTree.State list,lines) (s:PythTree.T) = 
+    let folder (stateStack:PythTree.State list,vertexCount) (s:PythTree.T) = 
 //        (printfn "\nINSTR: %A" s)
 //        stateStack |> List.iter (printfn "%A")
         match stateStack with
@@ -40,25 +42,27 @@ let folderPyth axiom =
             | PythTree.O ->
                 let newPos = PointF(state.pos.X + float32 (Math.Cos(float state.angle*Math.PI/180.0))*L,
                                     state.pos.Y + float32 (Math.Sin(float state.angle*Math.PI/180.0))*L)
-                ({state with pos = newPos} :: t,
-                 Array.concat([lines; [|state.pos; newPos|] ]))
+                lines.[vertexCount] <- state.pos
+                lines.[vertexCount+1] <- newPos
+                ({state with pos = newPos} :: t, (vertexCount+2))
             | PythTree.I -> 
                 let newPos = PointF(state.pos.X + float32 (Math.Cos(float state.angle*Math.PI/180.0))*LL,
                                     state.pos.Y + float32 (Math.Sin(float state.angle*Math.PI/180.0))*LL)
-                ({state with pos = newPos} :: t,
-                 Array.concat([lines; [|state.pos; newPos|] ]))
+                lines.[vertexCount] <- state.pos
+                lines.[vertexCount+1] <- newPos
+                ({state with pos = newPos} :: t, (vertexCount+2))
             | PythTree.LB ->
                 let newState = { state with angle = state.angle + 45 }
-                (newState::stateStack,lines)
+                (newState::stateStack,vertexCount)
             | PythTree.RB ->
                 match t with
                 | h :: t ->
                     let newState = { h with angle = h.angle - 45 }    
-                    (newState::t,lines)
-                | _ -> (stateStack,lines)
+                    (newState::t,vertexCount)
+                | _ -> (stateStack,vertexCount)
         | _ -> failwith "should not happen"
 
-    let _finalState,lines = axiom |> Array.fold folder (state,Array.empty)
+    let _finalState,finalvertexCount = axiom |> Array.fold folder (state,0)
     lines
 
 
@@ -66,11 +70,12 @@ open PythTree
 
 [<EntryPoint;STAThread>]
 let main argv = 
-//    let make() =
-//        let sys = PythTree.system()
+    let make(n:int) =
+        let sys = PythTree.system()
+        let naive = LSystem.step sys.rules
 //        let stepper = Stepper.HigherStepper(sys.rules)
 //        let pstepper = Stepper.ActorStepper(sys.rules, 4)
-//        let finalDerivation = [1..13] |> Seq.fold (fun state _ -> stepper.step state) sys.axiom
-//        folderPyth finalDerivation //[|I;LB;O;RB;O|] //
-//    Renderer.run(make)
+        let finalDerivation = [1..n] |> Seq.fold (fun state _ -> naive state) sys.axiom
+        folderPyth finalDerivation //[|I;LB;O;RB;O|] //
+    Renderer.run(make)
     0

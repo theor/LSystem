@@ -9,7 +9,11 @@ open SlimDX.Direct3D11
 open SlimDX.Direct2D
 open SlimDX.Windows
 
-let run(makeLines:unit -> PointF[]) =
+type RenderState = { mutable n : int
+                     mutable redraw : bool }
+
+
+let run(makeLines:int -> PointF[]) =
     Application.EnableVisualStyles();
     Application.SetCompatibleTextRenderingDefault(false);
     let form = new RenderForm("LSys - Q/A: angleGrowth - W/S: initAngle")
@@ -44,7 +48,15 @@ let run(makeLines:unit -> PointF[]) =
     
     form.Size = new Size(800, 600) |> ignore
 
-    let lines = durationp makeLines
+    let mutable renderState = { n = 5; redraw = true }
+    let needRedraw() = renderState.redraw <- true
+    form.KeyDown.Add (fun e -> 
+        match e.KeyCode with
+        | Keys.Add -> renderState.n <- renderState.n + 1; needRedraw()
+        | Keys.Subtract -> if renderState.n > 0 then renderState.n <- renderState.n - 1; needRedraw()
+        | _ -> ())
+
+    let mutable lines = durationp (fun () -> makeLines renderState.n)
    
 //    let _,lines,_ = [1..10] |> Seq.fold f (sys.axiom,[||],[LSys.PythTree.init 400.0f 300.0f])
 //    let lines = [|Point(0,0); Point(800,100)|]
@@ -53,6 +65,10 @@ let run(makeLines:unit -> PointF[]) =
         renderTarget.BeginDraw()
         renderTarget.Transform <- Matrix3x2.Identity
         renderTarget.Clear(Color4(Color.Black))
+
+        if renderState.redraw then
+            lines <- durationp (fun () -> makeLines renderState.n)
+            renderState.redraw <- false
 
         use brush = new SolidColorBrush(renderTarget, new Color4(Color.White))
                     
