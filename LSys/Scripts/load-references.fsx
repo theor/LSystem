@@ -9,3 +9,5 @@
 #r @"System.Numerics.dll"
 #r @"System.Windows.Forms.dll"
 #r @"WindowsBase.dll"
+#r @"..\..\lib\SpriteTextRenderer.dll"
+#r @"..\..\lib\SpriteTextRenderer.SlimDX.dll"

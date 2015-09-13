@@ -77,5 +77,6 @@ let main argv =
 //        let pstepper = Stepper.ActorStepper(sys.rules, 4)
         let finalDerivation = [1..n] |> Seq.fold (fun state _ -> naive state) sys.axiom
         folderPyth finalDerivation //[|I;LB;O;RB;O|] //
-    Renderer.run(make)
+    Renderer2.run()
+//    Renderer.run(make)
     0

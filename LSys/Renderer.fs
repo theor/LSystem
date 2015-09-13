@@ -10,20 +10,32 @@ open SlimDX.Direct2D
 open SlimDX.Windows
 
 type RenderState = { mutable n : int
-                     mutable redraw : bool }
+                     mutable redraw : bool
+                     mutable zoom : float32
+                     mutable translation : float32*float32 }
 
+module TextRenderer =
+    open SlimDX.DirectWrite
+    open SpriteTextRenderer.SlimDX
+    type TextRenderer(device) =
+        let sprite = new SpriteRenderer(device)
+        member val textBlock = new TextBlockRenderer(sprite, "Arial", FontWeight.Bold, SlimDX.DirectWrite.FontStyle.Normal, FontStretch.Normal, 16.0f)
+        interface System.IDisposable with
+            member x.Dispose() =
+                x.textBlock.Dispose()
+                sprite.Dispose()
 
 let run(makeLines:int -> PointF[]) =
     Application.EnableVisualStyles();
     Application.SetCompatibleTextRenderingDefault(false);
     let form = new RenderForm("LSys - Q/A: angleGrowth - W/S: initAngle")
-    let swapChainDescription = new SwapChainDescription(BufferCount = 2,
+    let swapChainDescription = new SwapChainDescription(BufferCount = 1,
                                                         Usage = Usage.RenderTargetOutput,
                                                         OutputHandle = form.Handle,
                                                         IsWindowed = true,
-                                                        ModeDescription = new ModeDescription(0, 0, new Rational(60, 1), Format.R8G8B8A8_UNorm),
+                                                        ModeDescription = new ModeDescription(800, 600, new Rational(60, 1), Format.R8G8B8A8_UNorm),
                                                         SampleDescription = new SampleDescription(1, 0),
-                                                        Flags = SwapChainFlags.AllowModeSwitch,
+                                                        Flags = SwapChainFlags.None,
                                                         SwapEffect = SwapEffect.Discard)
     let (r,device,swapChain) = SlimDX.Direct3D11.Device.CreateWithSwapChain(DriverType.Hardware,
                                                                             DeviceCreationFlags.BgraSupport,
@@ -46,12 +58,34 @@ let run(makeLines:int -> PointF[]) =
     use factory= swapChain.GetParent<SlimDX.DXGI.Factory>()
     factory.SetWindowAssociation(form.Handle, WindowAssociationFlags.IgnoreAltEnter) |> ignore
     
-    form.Size = new Size(800, 600) |> ignore
+    let resize w h =
+        swapChain.ResizeBuffers(1, w, h, Format.R8G8B8A8_UNorm, SwapChainFlags.None) |> ignore
+        use backBuffer = Texture2D.FromSwapChain(swapChain, 0)
+        let renderView = new RenderTargetView(device, backBuffer)
+        device.ImmediateContext.Rasterizer.SetViewports(new Viewport(0.0f, 0.0f, (float32)w, (float32)h, 0.0f, 1.0f));
+        device.ImmediateContext.OutputMerger.SetTargets(renderView);
+        renderView
 
-    let mutable renderState = { n = 5; redraw = true }
+//    let renderView = resize 800 600
+
+//    use txt = new TextRenderer.TextRenderer(device)
+
+    let mutable renderState = { n = 5
+                                redraw = true
+                                zoom = 1.0f
+                                translation = 0.0f,0.0f }
     let needRedraw() = renderState.redraw <- true
+    form.MouseWheel.Add (fun e ->
+        if e.Delta > 0 then renderState.zoom <- renderState.zoom * 1.2f
+        else renderState.zoom <- renderState.zoom * 0.8f)
     form.KeyDown.Add (fun e -> 
+        let tr = 100.0f
+        let x,y = renderState.translation
         match e.KeyCode with
+        | Keys.Left -> renderState.translation <- x - tr/renderState.zoom, y
+        | Keys.Right -> renderState.translation <- x + tr/renderState.zoom, y
+        | Keys.Up -> renderState.translation <- x,y - tr/renderState.zoom
+        | Keys.Down -> renderState.translation <- x,y + tr/renderState.zoom
         | Keys.Add -> renderState.n <- renderState.n + 1; needRedraw()
         | Keys.Subtract -> if renderState.n > 0 then renderState.n <- renderState.n - 1; needRedraw()
         | _ -> ())
@@ -63,7 +97,8 @@ let run(makeLines:int -> PointF[]) =
 
     let mainLoop () =
         renderTarget.BeginDraw()
-        renderTarget.Transform <- Matrix3x2.Identity
+        let x,y = renderState.translation
+        renderTarget.Transform <-  Matrix3x2.Scale(renderState.zoom,renderState.zoom)* Matrix3x2.Translation(x,y)
         renderTarget.Clear(Color4(Color.Black))
 
         if renderState.redraw then
@@ -77,10 +112,10 @@ let run(makeLines:int -> PointF[]) =
             let b = lines.[i + 1]
 
             renderTarget.DrawLine(brush, float32 a.X, float32 a.Y, float32 b.X, float32 b.Y, 1.1f)
-
+//        txt.textBlock.DrawString((sprintf "%A" renderState), Vector2(30.0f), Color4(Color.White))
         renderTarget.EndDraw() |> ignore
 
-        swapChain.Present(0, PresentFlags.None) |> ignore
+        swapChain.Present(1, PresentFlags.None) |> ignore
 
     MessagePump.Run(form, mainLoop)
 
