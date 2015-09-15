@@ -63,6 +63,7 @@
     <Compile Include="LSys.fs" />
     <Compile Include="Stepper.fs" />
     <Compile Include="Renderer.fs" />
+    <Compile Include="FrameMonitor.fs" />
     <Compile Include="Renderer2.fs" />
     <Compile Include="Program.fs" />
     <None Include="App.config" />

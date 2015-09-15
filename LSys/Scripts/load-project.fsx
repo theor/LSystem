@@ -6,5 +6,6 @@
       @"..\LSys.fs"
       @"..\Stepper.fs"
       @"..\Renderer.fs"
+      @"..\FrameMonitor.fs"
       @"..\Renderer2.fs"
       @"..\Program.fs"

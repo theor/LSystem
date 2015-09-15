@@ -30,9 +30,9 @@ let test_sys<'a when 'a:equality and 'a:comparison> (sys:LSystem<'a>) n =
 let folderPyth axiom =
     let totalVertices = axiom |> Array.sumBy (function | PythTree.O | PythTree.I -> 2 | _ -> 0)
     let lines = Array.zeroCreate totalVertices
-    let factor = 0.005f
+    let factor = 1.0f
     let L,LL = factor*5.0f,factor*8.0f
-    let state = [PythTree.init 400.0f 300.0f]
+    let state = [PythTree.init 200.0f 150.0f]
     let folder (stateStack:PythTree.State list,vertexCount) (s:PythTree.T) = 
 //        (printfn "\nINSTR: %A" s)
 //        stateStack |> List.iter (printfn "%A")
@@ -67,16 +67,28 @@ let folderPyth axiom =
 
 
 open PythTree
+module Renderers =
+    open SlimDX
+    open SlimDX.Direct2D
+    type PythTreeRenderer(rt:RenderTarget) =
+        let sys = PythTree.system()
+        let naive = LSystem.step sys.rules
+        let brush = new SolidColorBrush(rt, new Color4(Color.White))
+        let mutable lines : PointF[] = [||]
+
+        interface Renderer2.IDrawable with
+            member x.compute s =
+                let finalDerivation = [1..s.n] |> Seq.fold (fun state _ -> naive state) sys.axiom
+                lines <- folderPyth finalDerivation //[|I;LB;O;RB;O|] //
+            member x.render s =
+                for i in 0 .. 2 .. (Array.length lines) - 1 do
+                    let a = lines.[i]
+                    let b = lines.[i + 1]
+
+                    rt.DrawLine(brush, float32 a.X, float32 a.Y, float32 b.X, float32 b.Y, 1.1f)
 
 [<EntryPoint;STAThread>]
 let main argv = 
-    let make(n:int) =
-        let sys = PythTree.system()
-        let naive = LSystem.step sys.rules
-//        let stepper = Stepper.HigherStepper(sys.rules)
-//        let pstepper = Stepper.ActorStepper(sys.rules, 4)
-        let finalDerivation = [1..n] |> Seq.fold (fun state _ -> naive state) sys.axiom
-        folderPyth finalDerivation //[|I;LB;O;RB;O|] //
-    Renderer2.run()
+    Renderer2.run(fun rt -> Renderers.PythTreeRenderer(rt))
 //    Renderer.run(make)
     0
